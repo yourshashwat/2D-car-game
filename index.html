@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>2D Car Racing Game</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="gameContainer">
+    
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas" width="400" height="600"></canvas>
+
+    <!-- Top Buttons: Pause and Restart -->
+    <div id="topButtons">
+      <button id="pauseButton" class="overlay-btn">Pause</button>
+      <button id="restartButton" class="overlay-btn">Restart</button>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="startScreen">
+      <h1>🏎️ <span style="color: white;">Car <span style="color: orange;">Racing</span></span></h1>
+      <p style="color:white; font-size: larger;">Enter your name to start!</p>
+      <input type="text" id="playerNameInput" placeholder="Your name" />
+      <button id="startButton" class="start-btn">Start Game</button>
+
+      <div id="leaderboard">
+        <h2>🏆 Leaderboard</h2>
+        <ol id="leaderboardList"></ol>
+      </div>
+    </div>
+
+    <!-- Dark fade overlay -->
+    <div id="overlayDim"></div>
+
+    <!-- Game Over Screen -->
+    <div id="gameOverScreen">
+      <h2>Game Over!</h2>
+      <p class="final-score">Final Score: <span id="finalScore">0</span></p>
+      <p class="high-score">Your Highest Score: <span id="highestScore">0</span></p>
+      <p class="message">You crashed! Try again to beat your score.</p>
+      <button id="playAgainButton" class="start-btn">Play Again</button>
+    </div>
+
+    <!-- ✅ Mobile Controls -->
+    <div id="mobileControls">
+      <button id="leftButton" class="mobile-btn">⬅️</button>
+      <button id="rightButton" class="mobile-btn">➡️</button>
+    </div>
+
+  </div>
+
+  <!-- Game Script -->
+  <script src="script.js"></script>
+</body>
+</html>
