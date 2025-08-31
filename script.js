@@ -1,176 +1,145 @@
-const crashSound= new Audio("assets/crash.mp3");
-const levelUpSound= new Audio("assets/level-up.mp3");
+// =================================================================
+// SECTION 1: CONFIGURATION & GAME STATE VARIABLES
+// =================================================================
 
+// --- Game Constants ---
+const SCORE_RATE = 1;
+const NUM_LANES = 5;
+
+// --- Difficulty Settings ---
+let enemySpeed = 4;             // Initial speed of enemy cars
+const SPEED_INCREASE = 0.25;    // How much speed increases at each milestone
+const MILESTONE_POINTS = 500;   // Score needed to reach a new difficulty milestone
+const SPAWN_RATE_DECREASE = 5;  // How much the spawn interval decreases at each milestone
+let ENEMY_SPAWN_INTERVAL = 90;  // Initial wait time (in frames) between enemy spawns
+
+// --- Game State Variables --
+let score = 0;
 let lastMilestone = 0;
-const startBtn= document.getElementById("startButton");
-const startScreen= document.getElementById("startScreen");
-const topButtons= document.getElementById("topButtons");
- let playerName="";
- let leaderboard=JSON.parse(localStorage.getItem("leaderboard")) || [];
+let enemySpawnTimer = 0;
+let gameOver = false;
+let paused = false;
+let animationId = null;
+let playerName = "";
 
- const gameOverScreen = document.getElementById("gameOverScreen");
+// --- Leaderbard ---
+let leaderboard = JSON.parse(localStorage.getItem("leaderboard")) || [];
+
+// =================================================================
+// SECTION 2: DOM ELEMENTS
+// =================================================================
+
+// --- Canvas Setup ---
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+// --- DOM Element References ---
+const startBtn = document.getElementById("startButton");
+const startScreen = document.getElementById("startScreen");
+const topButtons = document.getElementById("topButtons");
+const gameOverScreen = document.getElementById("gameOverScreen");
 const finalScoreText = document.getElementById("finalScore");
 const highestScoreText = document.getElementById("highestScore");
 const playAgainBtn = document.getElementById("playAgainButton");
-const overlayDim= document.getElementById("overlayDim");
+const overlayDim = document.getElementById("overlayDim");
+const pauseBtn = document.getElementById("pauseButton");
+const restartBtn = document.getElementById("restartButton");
 
-let score= 0;
-let gameTicks=0;
-const SCORE_RATE=1;
-let lastSpawnDecreaseScore = 0;
-let enemySpeed = 4;             // initial speed of enemy cars
-const SPEED_INCREMENT = 0.2;    // how much to increase
-const SPEED_INTERVAL = 500;     // how many frames before increasing speed
-
-let animationId=null;
-
-const playerCarImg= new Image();
-playerCarImg.src="assets/playerCar.png"
+// --- Asset Loading (Images & Sounds) ---
+const playerCarImg = new Image();
+playerCarImg.src = "assets/playerCar.png";
 const enemyCarImg = new Image();
 enemyCarImg.src = "assets/enemyCar.png";
+const crashSound = new Audio("assets/crash.mp3");
+const levelUpSound = new Audio("assets/level-up.mp3");
 
-const enemyCars = [];
-let gameOver = false;
-let enemySpawnTimer = 0;
-let ENEMY_SPAWN_INTERVAL = 90; // Adjust to control frequency of enemy car spawning
+// =================================================================
+// SECTION 3: CORE GAME SETUP
+// =================================================================
 
-
-const canvas=document.getElementById("gameCanvas");
-const ctx=canvas.getContext("2d");
-
-// add lanes
-const NUM_LANES=5;
-const lanes=[];
-const laneWidth=canvas.width/NUM_LANES;
-for(let i=0; i<NUM_LANES; i++){
-  lanes.push((i* laneWidth)+ (laneWidth/2));
-}
-
-let paused= false;
-const pauseBtn= document.getElementById("pauseButton");
-const restartBtn= document.getElementById("restartButton");
-
-startBtn.addEventListener("click", () => {
- const input=document.getElementById("playerNameInput");
- const name=input.value.trim();
- if(name === ""){
-        alert("Please enter your name to start the game.");
-        return;
- }  
-    playerName = formatName(name);
-    startScreen.style.display = "none"; // Hide the start screen
-    topButtons.style.display = "flex"; // Show the top buttons
-      //  Wait for both images before starting the game loop
-  if (playerCarImg.complete && enemyCarImg.complete) {
-    requestAnimationFrame(gameLoop);
-  } else {
-    // Load only once
-    playerCarImg.onload = () => {
-      if (enemyCarImg.complete) {
-        requestAnimationFrame(gameLoop);
-      }
-    };
-    enemyCarImg.onload = () => {
-      if (playerCarImg.complete) {
-        requestAnimationFrame(gameLoop);
-      }
-    };
-  }
-});
-
-function formatName(name) {
-  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-}
-
-
-playAgainBtn.addEventListener("click", () => {
-  gameOverScreen.style.display = "none";
-  startScreen.style.display = "block";
-  pauseBtn.innerText = "Pause";
-  score = 0;
-  enemySpeed=4;
-  lastSpawnDecreaseScore=0;
-  lastMilestone=0;
-  enemyCars.length = 0;
-  ENEMY_SPAWN_INTERVAL=90;
-  gameOver = false;
-  paused = false;
-  enemySpawnTimer = 0;
-  playerCar.x = canvas.width / 2 - playerCar.width / 2;
-  playerCar.y = canvas.height - 130;
-  overlayDim.style.display = "none";
-
-});
-
-
-function updateLeaderboardDisplay(){
-  const list = document.getElementById("leaderboardList");
-  list.innerHTML = "";
-
-  leaderboard
-    .sort((a, b) => b.score - a.score)  // Sort from high to low
-    .slice(0, 5)                        // ✅ Show only top 5
-    .forEach((entry, index) => {
-      const li = document.createElement("li");
-      li.innerText = `${index + 1}. ${" "+ entry.name}: ${" "+entry.score}`;
-      list.appendChild(li);
-    });
-}
-
- updateLeaderboardDisplay(); // Initial display of leaderboard
-
-pauseBtn.addEventListener("click", () => {
-  paused = !paused;
-  pauseBtn.innerText = paused ? "Play" : "Pause";
-
-  if (!paused && !gameOver) {
-    requestAnimationFrame(gameLoop);
-  }
-});
-
-
-restartBtn.addEventListener("click", () => {
-    // Reset game state
-    if(animationId){
-      cancelAnimationFrame(animationId);
-    }
-    score = 0;
-    enemySpeed=4;
-    gameTicks=0;
-    lastSpawnDecreaseScore=0;
-    lastMilestone=0;
-    enemyCars.length = 0; // Clear enemy cars
-
-    gameOver = false;
-    paused = false;
-    ENEMY_SPAWN_INTERVAL=90;
-    pauseBtn.innerText = "Pause"; // Reset pause button text
-    enemySpawnTimer = 0;
-    playerCar.x = canvas.width / 2 - playerCar.width / 2; // Reset player car position
-    playerCar.y = canvas.height - 130; // Reset player car position
-    updateLeaderboardDisplay();
-
-    // Restart the game loop
-    animationId= requestAnimationFrame(gameLoop);
-});
-
-// define player car properties
-const playerCar={
-    width:42,
-    height:90,
-    currentLane:2, 
-    x: lanes[2]-21,  // Start in the middle lane (0, 1, 2, 3, 4)
-    y:canvas.height-130,    // Position the car above the bottom of the canvas
-    
-    
+// - - Player Car Object --
+const playerCar = {
+    width: 42,
+    height: 90,
+    currentLane: 2,
+    x: 0, 
+    y: canvas.height - 130, // Position the car near the bottom
 };
 
-// Road line settings
+// --- Lane Calculation ---
+const lanes = [];
+const laneWidth = canvas.width / NUM_LANES;
+for (let i = 0; i < NUM_LANES; i++) {
+    lanes.push((i * laneWidth) + (laneWidth / 2));
+}
+playerCar.x = lanes[playerCar.currentLane] - (playerCar.width / 2); // Set initial car position
+
+// --- Enemy Car Array ---
+const enemyCars = [];
+
+// --- Road Line Settings ---
 const lineWidth = 4;
 const lineLength = 60;
 const lineGap = 100; // Gap between lines
 let lineOffset = 0; // Used to animate downward scrolling
 
+// =================================================================
+// SECTION 4: MAIN GAME LOOP
+// =================================================================
+
+function gameLoop() {
+    if (gameOver) {
+        return;
+    }
+    if (paused) {
+        return; // If the game is paused, skip the rest of the loop
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height); // clear the canvas to draw new frame
+
+    score += SCORE_RATE; // increment score after every frame
+
+    // --- Difficulty Increase Logic ---
+    if (score - lastMilestone >= MILESTONE_POINTS) {
+        // increase enemy speed
+        enemySpeed += SPEED_INCREASE;
+
+        // decrease enemy spawn interval to make them appear faster
+        if (ENEMY_SPAWN_INTERVAL > 30) {
+            ENEMY_SPAWN_INTERVAL -= SPAWN_RATE_DECREASE;
+        }
+
+        levelUpSound.play();
+        lastMilestone = score; // Set the new milestone checkpoint
+    }
+
+    // --- Drawing ---
+    drawRoad();
+    drawPlayerCar();
+    drawEnemyCars();
+    drawScore();
+
+    // --- Updates & Mechanics ---
+    updateEnemyCars();
+    checkCollisions();
+
+    // --- Enemy Spawning Logic ---
+    enemySpawnTimer++;
+    if (enemySpawnTimer >= ENEMY_SPAWN_INTERVAL) {
+        createEnemyCar(); // when the timer reaches target, spawn a new car
+        enemySpawnTimer = 0; // and reset the timer
+    }
+
+    // Request the next frame to continue the loop
+    animationId = requestAnimationFrame(gameLoop);
+}
+
+
+// =================================================================
+// SECTION 5: GAME LOGIC & HELPER FUNCTIONS
+// =================================================================
+
+// --- Drawing Functions ---
 function drawRoad() {
     ctx.fillStyle = 'white';
     const centerX = canvas.width / 2 - lineWidth / 2;
@@ -180,101 +149,58 @@ function drawRoad() {
     }
 
     // Update lineOffset for animation
-    lineOffset +=2; // Speed of road scroll
+    lineOffset += 2; // Speed of road scroll
     if (lineOffset >= lineLength + lineGap) {
         lineOffset = 0;
     }
 }
 
-//draw player car
 function drawPlayerCar() {
-   ctx.drawImage(
-    playerCarImg,
-    playerCar.x,
-    playerCar.y,
-    playerCar.width,
-    playerCar.height
-  );
+    ctx.drawImage(playerCarImg, playerCar.x, playerCar.y, playerCar.width, playerCar.height);
 }
 
-document.addEventListener('keydown', (event)=>{
-
-    if(gameOver || paused) return;
-    if(event.key==='ArrowLeft' ){
-        if(playerCar.currentLane>0){
-          playerCar.currentLane--;
-        }
+function drawEnemyCars() {
+    for (const enemy of enemyCars) {
+        ctx.drawImage(enemyCarImg, enemy.x, enemy.y, enemy.width, enemy.height);
     }
-    else if(event.key==='ArrowRight'){
-         if(playerCar.currentLane< NUM_LANES-1){
-          playerCar.currentLane++;
-        }
-    }
-    playerCar.x=lanes[playerCar.currentLane]- (playerCar.width/2);
-    
-});
+}
 
-document.getElementById("leftButton").addEventListener("click", () => {
-   if (playerCar.currentLane > 0) {
-        playerCar.currentLane--;
-        playerCar.x = lanes[playerCar.currentLane] - (playerCar.width / 2);
-    }
-});
+function drawScore() {
+    const text = "Score: " + score;
+    ctx.font = "24px Arial";
+    ctx.fillStyle = "white";
+    ctx.fillText(text, 10, 30); // Draw score at the top left
+}
 
-document.getElementById("rightButton").addEventListener("click", () => {
-   if (playerCar.currentLane < NUM_LANES - 1) {
-        playerCar.currentLane++;
-        playerCar.x = lanes[playerCar.currentLane] - (playerCar.width / 2);
-    }
-});
-
-
-
-// Function to create a new enemy car
-
+// --- Enemy & Collision Functions ---
 function createEnemyCar() {
     const carWidth = 42;
     const carHeight = 90;
-   
-    const randomLane= Math.floor(Math.random()*NUM_LANES);
+    const randomLane = Math.floor(Math.random() * NUM_LANES);
 
-    if(enemyCars.length<2 && playerCar.currentLane=== randomLane){
-      const newLane= (randomLane+1)% NUM_LANES;
-      const x= lanes[newLane]-carWidth/2;
-      const y= -carHeight;
-      enemyCars.push({x,y,width:carWidth, height:carHeight})
-    }
-    else{
-      const x = lanes[randomLane] - (carWidth / 2); // Center the enemy in the random lane
-        const y = -carHeight; 
+    // This logic prevents the first two cars from spawning directly in the player's lane
+    if (enemyCars.length < 2 && playerCar.currentLane === randomLane) {
+        const newLane = (randomLane + 1) % NUM_LANES;
+        const x = lanes[newLane] - carWidth / 2;
+        const y = -carHeight;
+        enemyCars.push({ x, y, width: carWidth, height: carHeight });
+    } else {
+        const x = lanes[randomLane] - (carWidth / 2); // Center the enemy in the random lane
+        const y = -carHeight;
         enemyCars.push({ x, y, width: carWidth, height: carHeight });
     }
 }
 
-function drawEnemyCars(){
-    for(const enemy of enemyCars){
-        ctx.drawImage(
-      enemyCarImg,
-      enemy.x,
-      enemy.y,
-      enemy.width,
-      enemy.height
-    );
-    }
-}
+function updateEnemyCars() {
+    for (let i = enemyCars.length - 1; i >= 0; i--) {
+        enemyCars[i].y += enemySpeed;
 
-// This function moves the enemy cars
-function updateEnemyCars(){
-    for(let i=enemyCars.length-1;i>=0;i--){
-        enemyCars[i].y+=enemySpeed;
-
-        if(enemyCars[i].y>canvas.height){
-            enemyCars.splice(i,1);  // removes the enemy car from the screen if they move outside the road
+        // removes the enemy car from the array if they move off the screen
+        if (enemyCars[i].y > canvas.height) {
+            enemyCars.splice(i, 1);
         }
     }
 }
-
-
 
 function checkCollisions() {
     for (const enemy of enemyCars) {
@@ -286,90 +212,179 @@ function checkCollisions() {
 
         if (hit) {
             crashSound.play();
-  gameOver = true;
+            gameOver = true;
+            handleGameOver();
+        }
+    }
+}
 
-  // Save or update leaderboard
-  const existing = leaderboard.find(entry => entry.name.toLowerCase() === playerName.toLocaleLowerCase());
-  let highScore = score;
-  if (!existing || score > existing.score) {
-    if (existing) {
-      existing.score = score;
+// =================================================================
+// SECTION 6: UI, STATE MANAGEMENT & UTILITIES
+// =================================================================
+
+function handleGameOver() {
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Save or update leaderboard
+    
+    const existing = leaderboard.find(entry => entry.name.toLowerCase() === playerName.toLocaleLowerCase());
+    let highScore = score;
+    if (!existing || score > existing.score) {
+        if (existing) {
+            existing.score = score;
+        } else {
+            leaderboard.push({ name: playerName, score });
+        }
+        localStorage.setItem("leaderboard", JSON.stringify(leaderboard));
+        updateLeaderboardDisplay();
     } else {
-      leaderboard.push({ name: playerName, score });
+        highScore = existing.score;
     }
-    localStorage.setItem("leaderboard", JSON.stringify(leaderboard));
+
+    // Show Game Over screen
+    overlayDim.style.display = "block";
+    finalScoreText.textContent = score;
+    highestScoreText.textContent = highScore;
+    gameOverScreen.style.display = "flex";
+    topButtons.style.display = "none";
+}
+
+function updateLeaderboardDisplay() {
+    const list = document.getElementById("leaderboardList");
+    list.innerHTML = "";
+
+    leaderboard
+        .sort((a, b) => b.score - a.score) // Sort from high to low
+        .slice(0, 5)                       //  Show only top 5
+        .forEach((entry, index) => {
+            const li = document.createElement("li");
+            li.innerText = `${index + 1}. ${" " + entry.name}: ${" " + entry.score}`;
+            list.appendChild(li);
+        });
+}
+
+/** Resets all game variables to their initial state. */
+function resetGame() {
+    if (animationId) {
+        cancelAnimationFrame(animationId);
+    }
+    score = 0;
+    enemySpeed = 4;
+    lastMilestone = 0;
+    enemyCars.length = 0; // Clear enemy cars
+    ENEMY_SPAWN_INTERVAL = 90;
+    enemySpawnTimer = 0;
+    gameOver = false;
+    paused = false;
+
+    // Reset player car position
+    playerCar.currentLane = 2;
+    playerCar.x = lanes[playerCar.currentLane] - (playerCar.width / 2);
+    playerCar.y = canvas.height - 130;
+
+    // Reset UI elements
+    pauseBtn.innerText = "Pause";
+    overlayDim.style.display = "none";
+    gameOverScreen.style.display = "none";
+    topButtons.style.display = "flex";
+
     updateLeaderboardDisplay();
-  } else {
-    highScore = existing.score;
-  }
-
-  // Show Game Over screen
-  overlayDim.style.display="block";
-  finalScoreText.textContent = score;
-  highestScoreText.textContent = highScore;
-  gameOverScreen.style.display = "flex";
-  topButtons.style.display = "none";
 }
 
-    }
-}
-
-function drawScore() {
-    const text = "Score: " + score;
-
-    ctx.font = "24px Arial";
-    ctx.fillStyle = "white";
-    ctx.fillText(text, 10, 30); // Draw score at the top left
-    // make its z index higher than the road and player car
+function formatName(name) {
+    return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
 }
 
 
-function gameLoop() {
-    if (gameOver) {
-        ctx.font = "30px Arial";
-        ctx.fillStyle = "white";
-       // ctx.fillText("Game Over!", canvas.width / 2 - 80, canvas.height / 2);
+// =================================================================
+// SECTION 7: EVENT LISTENERS
+// =================================================================
+
+// --- Button Clicks ---
+startBtn.addEventListener("click", () => {
+    const input = document.getElementById("playerNameInput");
+    const name = input.value.trim();
+    if (name === "") {
+        alert("Please enter your name to start the game.");
         return;
     }
-    
-    if(paused) return; // If the game is paused, skip the rest of the loop
+    playerName = formatName(name);
+    startScreen.style.display = "none"; // Hide the start screen
+    topButtons.style.display = "flex"; // Show the top buttons
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    score+=SCORE_RATE;
-    
-    gameTicks++;
-
-    if (gameTicks % SPEED_INTERVAL === 0) {
-    enemySpeed += SPEED_INCREMENT;
+    // Waiting for images to be fully loaded before starting
+    if (playerCarImg.complete && enemyCarImg.complete) {
+        animationId = requestAnimationFrame(gameLoop);
+    } else {
+        // Set up onload events if images aren't ready yet
+        playerCarImg.onload = () => {
+            if (enemyCarImg.complete) animationId = requestAnimationFrame(gameLoop);
+        };
+        enemyCarImg.onload = () => {
+            if (playerCarImg.complete) animationId = requestAnimationFrame(gameLoop);
+        };
     }
-    if (score - lastMilestone >= 1000) {
-    enemySpeed += SPEED_INCREMENT;
-    levelUpSound.play();
-    lastMilestone = score;
-}
-   
+});
 
-    drawRoad();
-    drawPlayerCar();
+playAgainBtn.addEventListener("click", () => {
+    resetGame();
+    // After resetting, hide game elements and show the start screen again
+    topButtons.style.display = "none";
+    startScreen.style.display = "block";
+});
 
-    // Enemy logic
-    enemySpawnTimer++;
-    if (enemySpawnTimer >= ENEMY_SPAWN_INTERVAL) {
-        createEnemyCar();
-        enemySpawnTimer = 0;
+restartBtn.addEventListener("click", () => {
+    resetGame();
+    // Restart the game loop immediately
+    animationId = requestAnimationFrame(gameLoop);
+});
+
+pauseBtn.addEventListener("click", () => {
+    paused = !paused;
+    pauseBtn.innerText = paused ? "Play" : "Pause";
+
+    // If un-pausing, restart the game loop
+    if (!paused && !gameOver) {
+        animationId = requestAnimationFrame(gameLoop);
     }
+});
 
-  if (score - lastSpawnDecreaseScore >= 100) {
-  if (ENEMY_SPAWN_INTERVAL > 30) {
-    ENEMY_SPAWN_INTERVAL -= 3;
-    lastSpawnDecreaseScore = score;
-  }
-}
-    updateEnemyCars();
-    drawEnemyCars();
-    checkCollisions();
-    drawScore();
-   animationId= requestAnimationFrame(gameLoop);
-}
+// --- Player Controls ---
+document.addEventListener('keydown', (event) => {
+    if (gameOver || paused) return;
 
+    if (event.key === 'ArrowLeft') {
+        if (playerCar.currentLane > 0) {
+            playerCar.currentLane--;
+        }
+    } else if (event.key === 'ArrowRight') {
+        if (playerCar.currentLane < NUM_LANES - 1) {
+            playerCar.currentLane++;
+        }
+    }
+    playerCar.x = lanes[playerCar.currentLane] - (playerCar.width / 2);
+});
+
+document.getElementById("leftButton").addEventListener("click", () => {
+    if (gameOver || paused) return;
+    if (playerCar.currentLane > 0) {
+        playerCar.currentLane--;
+        playerCar.x = lanes[playerCar.currentLane] - (playerCar.width / 2);
+    }
+});
+
+document.getElementById("rightButton").addEventListener("click", () => {
+    if (gameOver || paused) return;
+    if (playerCar.currentLane < NUM_LANES - 1) {
+        playerCar.currentLane++;
+        playerCar.x = lanes[playerCar.currentLane] - (playerCar.width / 2);
+    }
+});
+
+// =================================================================
+// SECTION 8: INITIALIZATION
+// =================================================================
+
+// Display the leaderboard when the page first loads
+updateLeaderboardDisplay();
